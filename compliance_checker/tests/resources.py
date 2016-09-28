@@ -8,10 +8,8 @@ def get_filename(path):
     Returns the path to a valid dataset
     '''
     filename = resource_filename('compliance_checker', path)
-    print filename
     nc_path = filename.replace('.cdl', '.nc')
     if not os.path.exists(nc_path):
-        print nc_path
         generate_dataset(filename, nc_path)
     return nc_path
 

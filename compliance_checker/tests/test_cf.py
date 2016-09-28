@@ -63,8 +63,6 @@ class TestCF(unittest.TestCase):
         '''
         Return a loaded NC Dataset for the given path
         '''
-        print '***************'
-        print nc_dataset
         if not isinstance(nc_dataset, str):
             raise ValueError("nc_dataset should be a string")
 
