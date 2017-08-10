@@ -262,7 +262,7 @@ class StandardNameTable(object):
             return vals[0].text
 
     def __init__(self, cached_location=None):
-        if cached_location:
+        if cached_location and os.path.exists(cached_location):
             with io.open(cached_location, 'r', encoding='utf-8') as fp:
                 resource_text = fp.read()
         else:
