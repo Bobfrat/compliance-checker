@@ -359,7 +359,8 @@ class CFBaseCheck(BaseCheck):
                                np.float32,
                                np.double,
                                'int16',
-                               'float32'
+                               'float32',
+                               str
                                ]:
 
                 fails.append('The variable {} failed because the datatype is {}'.format(k, v.datatype))
