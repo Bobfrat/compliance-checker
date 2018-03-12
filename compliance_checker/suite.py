@@ -12,6 +12,7 @@ import itertools
 from operator import itemgetter
 from netCDF4 import Dataset
 from lxml import etree as ET
+from distutils.version import StrictVersion
 from compliance_checker.base import fix_return_value, Result, GenericFile
 from owslib.sos import SensorObservationService
 from owslib.swe.sensor.sml import SensorML
@@ -67,11 +68,17 @@ class CheckSuite(object):
                 print("Could not load", x, ":", e, file=sys.stderr)
         # find the latest version of versioned checkers and set that as the
         # default checker for compliance checker if no version is specified
-        ver_checkers = [c.split(':', 1) for c in cls.checkers if ':' in c]
+        ver_checkers = sorted([c.split(':', 1) for c
+                               in cls.checkers if ':' in c])
         for spec, versions in itertools.groupby(ver_checkers, itemgetter(0)):
-            # right now this looks for character order. May break if
-            # version specifications become more complicated
-            latest_version = max(v[-1] for v in versions)
+            version_nums = [v[-1] for v in versions]
+            try:
+                latest_version = str(max(StrictVersion(v) for v
+                                         in version_nums))
+            # if the version can't be parsed as a StrictVersion, parse
+            # according to character collation
+            except ValueError:
+                latest_version = max(version_nums)
             cls.checkers[spec] = cls.checkers[spec + ':latest'] = \
                 cls.checkers[':'.join((spec, latest_version))]
 
@@ -187,51 +194,6 @@ class CheckSuite(object):
 
         return True
 
-    def get_priority_headers(self, check):
-        """
-        Method to determine which scoring terminology to use for the headers.
-        @param check name of the check being run
-
-        @return header_out  dict of header priorities
-        """
-        header_map = {
-            1: {  # Default
-                3: 'High Priority',
-                2: 'Medium Priority',
-                1: 'Low Priority'
-            },
-            2: {  # ACDD, IOOS
-                3: 'Highly Recommended',
-                2: 'Recommended',
-                1: 'Suggested'
-            },
-            3: {  # CF
-                3: 'Errors',
-                2: 'Warnings',
-                1: 'Info'
-            },
-            4: {  # NCEI
-                3: 'Required',
-                2: 'Recommended',
-                1: 'Suggested'
-            },
-        }
-        # Make a default selection
-        header_out = header_map.get(1)
-        # If check isn't defined, just use the default
-        if check is None:
-            return header_out
-
-        check = check.lower()
-        if check.startswith('acdd') or check.startswith('ioos'):
-            header_out = header_map.get(2)
-        elif check.startswith('cf'):
-            header_out = header_map.get(3)
-        elif check.startswith('ncei'):
-            header_out = header_map.get(4)
-
-        return header_out
-
     def build_structure(self, check_name, groups, source_name, limit=1):
         '''
         Compiles the checks, results and scores into an aggregate structure which looks like:
@@ -307,7 +269,7 @@ class CheckSuite(object):
         aggregates['all_priorities'] = all_priorities
         aggregates['testname'] = self._get_check_versioned_name(check_name)
         aggregates['source_name'] = source_name
-        aggregates['scoreheader'] = self.get_priority_headers(check_name)
+        aggregates['scoreheader'] = self.checkers[check_name]._cc_display_headers
         aggregates['cc_spec_version'] = self.checkers[check_name]._cc_spec_version
         return aggregates
 
@@ -410,17 +372,17 @@ class CheckSuite(object):
 
         return [groups, points, out_of]
 
-    def standard_output_generation(self, groups, limit, points, out_of, check=None):
+    def standard_output_generation(self, groups, limit, points, out_of, check):
         '''
         Generates the Terminal Output
         '''
         if points < out_of:
-            self.reasoning_routine(groups, 0, priority_flag=limit, check=check)
+            self.reasoning_routine(groups, 0, check, priority_flag=limit)
         else:
             print("All tests passed!")
 
-    def reasoning_routine(self, groups, indent, line=True, priority_flag=3,
-                          _top_level=True, check=None):
+    def reasoning_routine(self, groups, indent, check, line=True, priority_flag=3,
+                          _top_level=True):
         """
         print routine performed
         """
@@ -436,16 +398,16 @@ class CheckSuite(object):
         if _top_level:
             print('{:^80}'.format("Scoring Breakdown:"))
             print('\n')
-        check = check
-        priorities = self.get_priority_headers(check)
+        priorities = self.checkers[check]._cc_display_headers
         def process_table(res, check):
             issue = wrapper.fill("{}:".format(res.name))
             if not res.children:
                 reason = wrapper.fill(', '.join(res.msgs))
             else:
                 child_reasons = self.reasoning_routine(res.children,
-                                                        indent + 1,
-                                                        _top_level=False, check=check)
+                                                       indent + 1,
+                                                       check,
+                                                        _top_level=False)
                 # there shouldn't be messages if there are children
                 # is this a valid assumption?
                 reason = "\n{}".format(child_reasons)
