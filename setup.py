@@ -1,19 +1,23 @@
 from __future__ import with_statement
 from setuptools import setup, find_packages
+import io
 import versioneer
 
+
 def readme():
-    with open('README.md') as f:
+    with io.open('README.md', encoding='utf-8') as f:
         return f.read()
 
+
 def pip_requirements(fname='requirements.txt'):
-    with open(fname, 'r') as f:
+    with io.open(fname, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
             reqs.append(line)
     return reqs
+
 
 reqs = [line.strip() for line in open('requirements.txt')]
 
